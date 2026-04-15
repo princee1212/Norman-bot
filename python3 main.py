@@ -1,3 +1,4 @@
+python3 main.py
 import requests
 import time
 import os
