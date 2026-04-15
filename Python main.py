@@ -85,4 +85,5 @@ Chain: BNB (PancakeSwap)
 # ===== LOOP =====
 while True:
     get_swaps()
-    time.sleep(20)
+    send_telegram("Heartbeat: Norman running ✅")
+    time.sleep(60)
