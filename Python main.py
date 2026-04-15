@@ -1,13 +1,16 @@
 import requests
 import time
 import os
+from collections import defaultdict
 
-BOT_TOKEN = os.getenv("8793259832:AAHUmarr6U7JL4elvtdffb0kjr9ZAok-860")
-CHAT_ID = os.getenv("8432602325")
-MORALIS_API_KEY = os.getenv("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjdiNmIyZmY3LTg4ZDAtNDM0YS05NjcyLWZkYTExMmQ3NmE0OSIsIm9yZ0lkIjoiNTA5NzEwIiwidXNlcklkIjoiNTI0NDMxIiwidHlwZUlkIjoiMjllMGY5NWYtYzhlMC00ZTUwLWFlMTctYjI4NDk4NTY1M2E4IiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NzYyMDg2MTcsImV4cCI6NDkzMTk2ODYxN30.hw6XPrgXmnzj5GRkb6AUDplYHWg5phCDHZTRp7qcOvs")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+MORALIS_API_KEY = os.getenv("MORALIS_API_KEY")
 
-# PancakeSwap Router (BNB Chain)
 PANCAKE_ROUTER = "0x10ED43C718714eb63d5aA57B78B54704E256024E"
+
+# Track token activity
+token_tracker = defaultdict(list)
 
 # ===== TELEGRAM =====
 def send_telegram(msg):
@@ -29,10 +32,9 @@ def get_swaps():
     if "result" not in data:
         return
 
-    for tx in data["result"][:20]:
+    for tx in data["result"][:30]:
         try:
             usd_value = float(tx.get("value_usd", 0))
-
             if usd_value < 10000:
                 continue
 
@@ -40,35 +42,42 @@ def get_swaps():
             token_symbol = tx.get("token_symbol", "")
             contract = tx.get("address")
 
-            # ===== SIMPLE FILTERS =====
-            if token_name is None or len(token_name) < 2:
-                continue
-
-            # Ignore stablecoins (basic filter)
             if token_symbol in ["USDT", "USDC", "BUSD"]:
                 continue
 
+            buyer = tx.get("to_address")
+
+            # Track buys
+            token_tracker[contract].append(buyer)
+
+            # Remove duplicates (same wallet)
+            unique_buyers = list(set(token_tracker[contract]))
+
+            count = len(unique_buyers)
+
             # ===== SIGNAL LOGIC =====
-            signal = "⚠️ WATCH"
+            if count >= 3:
+                signal = "🔥 MULTI-WHALE ACCUMULATION"
+            elif count == 2:
+                signal = "⚠️ BUILDING MOMENTUM"
+            else:
+                signal = "🟡 SINGLE WHALE"
 
-            if usd_value > 50000:
-                signal = "🔥 STRONG BUY"
-
-            if usd_value > 100000:
-                signal = "🚀 WHALE ACCUMULATION"
-
-            message = f"""
-🚨 NORMAN SIGNAL V2
+            # Only alert when meaningful
+            if count >= 2:
+                message = f"""
+🚨 NORMAN V3 SIGNAL
 
 Token: {token_name} ({token_symbol})
 Buy Size: ${usd_value:,.2f}
 Contract: {contract}
 
-DEX: PancakeSwap (BNB)
+Whale Buyers: {count}
 Signal: {signal}
-"""
 
-            send_telegram(message)
+Chain: BNB (PancakeSwap)
+"""
+                send_telegram(message)
 
         except:
             continue
